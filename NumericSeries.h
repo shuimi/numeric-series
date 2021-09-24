@@ -8,6 +8,7 @@
 #include <iostream>
 #include <functional>
 #include <utility>
+#include <vector>
 
 namespace NumericSeries {
 
@@ -62,7 +63,7 @@ namespace NumericSeries {
             return seriesSum;
         }
 
-        Report setMeta(MetaInfo info){
+        Report setMeta(MetaInfo info) {
             this->meta = info;
             return *this;
         }
@@ -83,8 +84,11 @@ namespace NumericSeries {
     class NumericSeries {
     private:
 
+        T lowerThreshold = 0;
+        T higherThreshold = 16777216;
+
+        long long iterations = 0;
         T precision = 0;
-        T iterations = 0;
         T sum_ = 0;
 
         bool ignoreZeroDivision = false;
@@ -99,21 +103,45 @@ namespace NumericSeries {
 
         NumericSeries(NumericFunction function, T precision) : precision(precision), function(std::move(function)) {}
 
+
+        // LIFECYCLE METHODS
+
         NumericSeries setPrecision(T precision) {
             this->precision = precision;
             return *this;
         }
 
-        NumericSeries sum(T x, int startPoint) {
-            if (!ignoreZeroDivision && startPoint == 0) {
+        NumericSeries setThresholds(T lowerThreshold, T higherThreshold) {
+            this->setLowerThreshold(lowerThreshold);
+            this->setHigherThreshold(higherThreshold);
+            return *this;
+        }
+
+        NumericSeries setLowerThreshold(T lowerThreshold) {
+            this->lowerThreshold = lowerThreshold;
+            return *this;
+        }
+
+        NumericSeries setHigherThreshold(T higherThreshold) {
+            this->higherThreshold = higherThreshold;
+            return *this;
+        }
+
+        NumericSeries sum(T parameter) {
+            if (!ignoreZeroDivision && lowerThreshold == 0) {
                 throw "Zero division possibility, try ignore if you sure you have no critical division operations";
             }
 
             T newValue = precision;
             iterations = 0;
 
-            for (int i = startPoint; abs(newValue) >= precision; i++) {
-                newValue = function(x, i);
+            for (int i = lowerThreshold; abs(newValue) >= precision; i++) {
+
+                if (i > higherThreshold) {
+                    throw "Numeric series is probably divergent";
+                }
+
+                newValue = function(parameter, i);
                 sum_ += newValue;
                 iterations++;
             }
@@ -126,6 +154,13 @@ namespace NumericSeries {
             return *this;
         }
 
+        Report<T> report() {
+            return Report<T>(iterations, sum_);
+        };
+
+
+        // SERVICE METHODS
+
         NumericSeries setInitSum(T sum) {
             sum_ = sum;
             return *this;
@@ -136,20 +171,19 @@ namespace NumericSeries {
             return *this;
         }
 
-        Report<T> report() {
-            return Report<T>(iterations, sum_);
-        };
-
         NumericFunction getFunction() {
             return this->function;
         }
 
-        T getSum(){
+        T getSum() {
             return this->sum_;
         }
 
+
+        // OPERATORS
+
         NumericSeries operator+(const NumericSeries &other) {
-            NumericSeries series([other, this](T n, T k){
+            NumericSeries series([other, this](T n, T k) {
                 return other.function(n, k) + this->function(n, k);
             });
             return series;
@@ -163,7 +197,6 @@ namespace NumericSeries {
     };
 
 }
-
 
 
 #endif //NUMERICSERIES_NUMERICSERIES_H
